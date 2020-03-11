@@ -22,6 +22,7 @@ from colorize3_poisson import Colorize
 from common import *
 import traceback, itertools
 
+from config import RESULT_DIR
 
 class TextRegions(object):
     """
@@ -500,6 +501,14 @@ class RendererV3(object):
 
     def place_text(self,rgb,collision_mask,H,Hinv):
         font = self.text_renderer.font_state.sample()
+        font_family = font['family']
+        font_style = font['style']
+        font_family = font_family.replace(' ', '_')
+        font_family = font_family.replace(',', '_')
+        font_style = font_style.replace(' ', '_')
+        font_style = font_style.replace(',', '_')
+        font_prefix = font_family + '@' + font_style
+
         font = self.text_renderer.font_state.init_font(font)
 
         render_res = self.text_renderer.render_sample(font,collision_mask)
@@ -529,7 +538,7 @@ class RendererV3(object):
 
         im_final = self.colorizer.color(rgb,[text_mask],np.array([min_h]))
 
-        return im_final, text, bb, collision_mask
+        return im_final, text, bb, collision_mask, font_prefix
 
 
     def get_num_text_regions(self, nregions):
@@ -557,17 +566,19 @@ class RendererV3(object):
         # save character and word files as text files
         # print(len(wrds))
 
-        f = open('char_text.txt', 'a')
-        f1 = open('word_text.txt', 'a')
+        char_file = open(osp.join(RESULT_DIR, 'char', 'text.txt'), 'a')
+        word_file = open(osp.join(RESULT_DIR, 'word', 'text.txt'), 'a')
         for i in range(len(wrds)):
             # f1.write(wrds[i].encode('utf-8'))
             # f.write('\n')
             for j in range(len(wrds[i])):
-                f1.write(wrds[i].encode('utf-8'))
-                f1.write('\n')
-                f.write(wrds[i][j].encode('utf-8'))
-                f.write('\n')
+                word_file.write(wrds[i].encode('utf-8'))
+                word_file.write('\n')
+                char_file.write(wrds[i][j].encode('utf-8'))
+                char_file.write('\n')
 
+        char_file.close()
+        word_file.close()
 
         bb_idx = np.r_[0, np.cumsum([len(w) for w in wrds])]
         # bb_idx = np.r_[0, np.render_textmsum([len(w) for w in wrds])]
@@ -581,6 +592,7 @@ class RendererV3(object):
             cc = np.squeeze(np.concatenate(np.dsplit(cc,cc.shape[-1]),axis=1)).T.astype('float32')
             rect = cv2.minAreaRect(cc.copy())
             box = np.array(cv2.boxPoints(rect))
+            #box = np.array([cc[0,:], cc[-3,:], cc[-2,:], cc[3,:]])
 
             # find the permutation of box-coordinates which
             # are "aligned" appropriately with the character-bb.
@@ -619,6 +631,7 @@ class RendererV3(object):
                       'bb'  : 2x4xn matrix of bounding-boxes
                               for each character in the image.
                       'txt' : a list of strings.
+                      'font': font family and font style strings.
 
                   The correspondence b/w bb and txt is that
                   i-th non-space white-character in txt is at bb[:,:,i].
@@ -652,7 +665,7 @@ class RendererV3(object):
 
             print (colorize(Color.CYAN, " ** instance # : %d"%i))
 
-            idict = {'img':[], 'charBB':None, 'wordBB':None, 'txt':None}
+            idict = {'img':[], 'charBB':None, 'wordBB':None, 'txt':None, 'font':None}
 
             m = self.get_num_text_regions(nregions)#np.arange(nregions)#min(nregions, 5*ninstance*self.max_text_regions))
             reg_idx = np.arange(min(2*m,nregions))
@@ -663,10 +676,11 @@ class RendererV3(object):
             img = rgb.copy()
             itext = []
             ibb = []
+            ifont = []
 
             # process regions: 
             num_txt_regions = len(reg_idx)
-            NUM_REP = 5 # re-use each region three times:
+            NUM_REP = 1 # re-use each region multiple times:
             reg_range = np.arange(NUM_REP * num_txt_regions) % num_txt_regions
             for idx in reg_range:
                 ireg = reg_idx[idx]
@@ -691,18 +705,22 @@ class RendererV3(object):
 
                 if txt_render_res is not None:
                     placed = True
-                    img,text,bb,collision_mask = txt_render_res
+                    img, text, bb, collision_mask, prefix_font = txt_render_res
                     # update the region collision mask:
                     place_masks[ireg] = collision_mask
                     # store the result:
-                    itext.append(text)
+                    #itext.append(text)
+                    text_split = text.split('\n')
+                    itext.extend(text_split)
                     ibb.append(bb)
+                    ifont.extend([prefix_font for _ in text_split])
 
-            if  placed:
+            if placed:
                 try:
                     # at least 1 word was placed in this instance:
                     idict['img'] = img
                     idict['txt'] = itext
+                    idict['font'] = ifont
                     idict['charBB'] = np.concatenate(ibb, axis=2)
                     idict['wordBB'] = self.char2wordBB(idict['charBB'].copy(), ' '.join(itext))
                     res.append(idict.copy())
@@ -713,5 +731,6 @@ class RendererV3(object):
                         if i < ninstance-1:
                             raw_input(colorize(Color.BLUE,'continue?',True))
                 except:
+                    traceback.print_exc()
                     print("THIS IS THE REASON WHY!!!!!")                 
         return res

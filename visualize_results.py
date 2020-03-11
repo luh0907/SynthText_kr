@@ -19,6 +19,8 @@ from PIL import Image, ImageDraw
 import re
 import json
 
+from config import RESULT_DIR
+
 # initialize index
 num = 1
 char_ind = 0
@@ -92,8 +94,7 @@ def coords(x_list, y_list, k, img, typ):
 #  split words and create jpg files
 def _tojpg(text_im, polygon, index, k, typ):
     img = Image.fromarray(text_im, 'RGB')
-    img.save('images/'+k+'.jpg')
-    
+    img.save(os.path.join(RESULT_DIR, 'images', '{}.jpg'.format(k)))
 
     # convert to numpy (for convenience)
     imArray = np.asarray(img)
@@ -118,15 +119,9 @@ def _tojpg(text_im, polygon, index, k, typ):
 
     newIm = newIm.crop((x_min, y_min, x_max, y_max))
 
-    if typ == "char":
-        newIm.save("characters/"+typ+"_"+str(index)+".jpg")
-        f1 = open('ch_coords.txt', 'a')
-        f1.write(typ+str(index)+".jpg"+"\t"+str(x_min)+","+str(y_min)+","+str(x_max)+","+str(y_max)+"\n")
-
-    elif typ == "word":
-        newIm.save("words/"+typ+"_"+str(index)+".jpg")
-        f2 = open('wd_coords.txt', 'a')
-        f2.write(typ+str(index)+".jpg"+"\t"+str(x_min)+","+str(y_min)+","+str(x_max)+","+str(y_max)+"\n")
+    newIm.save(os.path.join(RESULT_DIR, typ, '{}_{}.jpg'.format(typ, index)))
+    with open(os.path.join(RESULT_DIR, typ, 'coords.txt'), 'a') as result_file:
+        result_file.write('{}_{}.jpg\t{},{},{},{}\n'.format(typ, index, x_min, y_min, x_max, y_max))
 
 
 def main(db_fname):
@@ -151,4 +146,4 @@ def main(db_fname):
     db.close()
 
 if __name__=='__main__':
-    main('gen/dset_kr.h5')
+    main(os.path.join(RESULT_DIR, 'dset_kr.h5'))

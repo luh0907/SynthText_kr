@@ -13,9 +13,11 @@ import scipy.stats as sstat
 import pygame, pygame.locals
 from pygame import freetype
 #import Image
-from PIL import Image
+from PIL import Image, ImageFont
 import math
 from common import *
+
+from config import DATA_DIR, FONT_LIST_FILE, FONT_MODEL_FILE, DICTIONARY_FILE
 
 # def is_korean(ch):
 #     if u'\uAC00' <= kr <=u'\uD7AF':
@@ -87,7 +89,7 @@ class RenderFont(object):
         Also, outputs ground-truth bounding boxes and text string
     """
 
-    def __init__(self, data_dir='data'):
+    def __init__(self, data_dir=os.path.join(DATA_DIR, 'data')):
         # distribution over the type of text:
         # whether to get a single word, paragraph or a line:
         self.p_text = {0.0 : 'WORD',
@@ -113,7 +115,7 @@ class RenderFont(object):
         #                               fn=osp.join(data_dir,'newsgroup/newsgroup.txt'))
 
         self.text_source = TextSource(min_nchar=self.min_nchar,
-                                      fn=osp.join(data_dir,'newsgroup/newsgroup.txt'))
+                                      fn=osp.join(data_dir, DICTIONARY_FILE))
 
 
         # get font-state object:
@@ -425,11 +427,11 @@ class FontState(object):
     random_kerning = 0.2
     random_kerning_amount = 0.1
 
-    def __init__(self, data_dir='mydata'):
+    def __init__(self, data_dir=os.path.join(DATA_DIR, 'data')):
     # def __init__(self, data_dir='ori_data'):
 
         # char_freq_path = osp.join(data_dir, 'models/char_freq.cp')        
-        font_model_path = osp.join(data_dir, 'models/font_px2pt.cp')
+        font_model_path = osp.join(data_dir, 'models', FONT_MODEL_FILE)
 
         # get character-frequencies in the English language:
         # with open(char_freq_path,'rb') as f:
@@ -457,8 +459,8 @@ class FontState(object):
             self.font_model = cp.load(f)
             
         # get the names of fonts to use:
-        self.FONT_LIST = osp.join(data_dir, 'fonts/fontlist.txt')
-        self.fonts = [os.path.join(data_dir,'fonts',f.strip()) for f in open(self.FONT_LIST)]
+        self.FONT_LIST = osp.join(data_dir, 'fonts', FONT_LIST_FILE)
+        self.fonts = [osp.join(data_dir, 'fonts', f.strip()) for f in open(self.FONT_LIST)]
 
 
     def get_aspect_ratio(self, font, size=None):
@@ -498,8 +500,12 @@ class FontState(object):
         """
         Samples from the font state distribution
         """
+        font_sampled = self.fonts[int(np.random.randint(0, len(self.fonts)))]
+        font_family, font_style = ImageFont.truetype(font_sampled).getname()
         return {
-            'font': self.fonts[int(np.random.randint(0, len(self.fonts)))],
+            'font': font_sampled,
+            'family': font_family,
+            'style': font_style,
             'size': self.size[1]*np.random.randn() + self.size[0],
             'underline': np.random.rand() < self.underline,
             'underline_adjustment': max(2.0, min(-2.0, self.underline_adjustment[1]*np.random.randn() + self.underline_adjustment[0])),
